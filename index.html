@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>سامانه اطلاعات حمل‌ونقل و سفارش</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <style>
+    :root{
+      --bg-1:#0e1117; --bg-2:#111827; --card:#171923cc; --muted:#a1a1aa;
+      --text:#f8fafc; --accent:#06b6d4; --accent-2:#22d3ee;
+      --danger:#ef4444; --success:#10b981; --warning:#f59e0b;
+      --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
+      --font:"Vazirmatn",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:var(--font); color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 100% -10%, #0ea5e9 5%, transparent 40%),
+        radial-gradient(1000px 500px at -10% 0%, #22d3ee 5%, transparent 35%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-2));
+      background-attachment: fixed;
+    }
+    .container{max-width:1200px;margin:32px auto 32px;padding:0 16px}
+    .grid{display:grid;gap:16px;grid-template-columns:repeat(12,1fr)}
+    .card{grid-column:1/-1;background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));backdrop-filter: blur(8px);border:1px solid rgba(255,255,255,.06);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+    @media (min-width: 960px){.span-6{grid-column:span 6}.span-8{grid-column:span 8}.span-4{grid-column:span 4}.span-12{grid-column:span 12}}
+    .section-title{margin:0 0 12px;font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px}
+    .section-title .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+    .form-grid{display:grid;gap:12px;grid-template-columns:repeat(12,1fr)}
+    .fg{grid-column:1/-1}
+    @media (min-width: 720px){.fg-6{grid-column:span 6}.fg-4{grid-column:span 4}.fg-3{grid-column:span 3}.fg-8{grid-column:span 8}}
+    label{display:block;margin-bottom:6px;font-size:.92rem;color:#cbd5e1;font-weight:600}
+    .req::after{content:" *"; color:var(--warning); font-weight:900}
+    input, select, textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0b1220;color:var(--text);outline:none;transition:border .2s,box-shadow .2s;font-family:var(--font)}
+    input::placeholder, textarea::placeholder{color:#6b7280}
+    input:focus, textarea:focus, select:focus{border-color:var(--accent-2);box-shadow:0 0 0 3px rgba(34,211,238,.2)}
+    input[readonly]{background:#0b1220; opacity:.85}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:linear-gradient(90deg,#06b6d4,#22d3ee);color:#01232b;font-weight:800;cursor:pointer;box-shadow:0 10px 28px rgba(34,211,238,.35);transition:transform .08s ease, filter .2s ease;user-select:none}
+    .btn:hover{filter:brightness(1.05)} .btn:active{transform:translateY(1px)}
+    .btn.secondary{background:transparent;color:#e2e8f0;border-color:rgba(148,163,184,.35)}
+    .btn.warn{background:linear-gradient(90deg,#f59e0b,#fde047);color:#1f1300}
+    .hint{font-size:.84rem;color:#9ca3af}
+    .table-wrap{overflow:auto;border-radius:12px;border:1px solid rgba(255,255,255,.08)}
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    th,td{padding:12px 14px;border-bottom:1px dashed rgba(255,255,255,.08);text-align:right}
+    th{background:linear-gradient(180deg, rgba(34,211,238,.08), transparent); color:#e5f6fb; font-weight:800}
+    tr:hover td{background:rgba(255,255,255,.02)}
+    #map{height:380px;border-radius:12px;border:1px solid rgba(255,255,255,.08)}
+    .toast{position:fixed;inset-inline-end:16px;bottom:16px;z-index:9999;padding:12px 14px;border-radius:12px;background:#0b1220;border:1px solid rgba(255,255,255,.12);box-shadow:var(--shadow);display:none;max-width:92vw}
+    .toast.show{display:block;animation:fadeIn .25s ease}
+    @keyframes fadeIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:translateY(0)}}
+    .small{font-size:.85rem}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    /* پیشنهادات جستجو (Search suggestions) */
+    .suggest{position:absolute;z-index:50;width:100%;max-height:260px;overflow:auto;margin-top:4px;background:#0b1220;border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:var(--shadow);display:none}
+    .suggest.show{display:block}
+    .suggest .item{padding:10px 12px;border-bottom:1px dashed rgba(255,255,255,.06);cursor:pointer}
+    .suggest .item:hover{background:rgba(34,211,238,.08)}
+    .relative{position:relative}
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <form id="orderForm" novalidate>
+      <div class="grid">
+
+        <!-- اطلاعات فرستنده -->
+        <section class="card span-6">
+          <h3 class="section-title"><span class="dot"></span>اطلاعات فرستنده</h3>
+          <div class="form-grid">
+            <div class="fg fg-6">
+              <label class="req" for="senderName">1. نام و نام خانوادگی فرستنده</label>
+              <input id="senderName" name="senderName" type="text" placeholder="مثال: علی رضایی" autocomplete="name" required>
+            </div>
+            <div class="fg fg-6">
+              <label for="senderNID">2. کد ملی فرستنده</label>
+              <input id="senderNID" name="senderNID" type="text" inputmode="numeric" placeholder="10 رقم" pattern="[\d۰-۹]{10}" maxlength="10">
+              <div class="hint small">اعتبارسنجی خودکار انجام می‌شود.</div>
+            </div>
+            <div class="fg">
+              <label for="originPost">3. کد پستی محل بارگیری (مبدأ)</label>
+              <input id="originPost" name="originPost" type="text" inputmode="numeric" placeholder="10 رقم" pattern="[\d۰-۹]{10}" maxlength="10">
+            </div>
+          </div>
+        </section>
+
+        <!-- اطلاعات گیرنده -->
+        <section class="card span-6">
+          <h3 class="section-title"><span class="dot"></span>اطلاعات گیرنده</h3>
+          <div class="form-grid">
+            <div class="fg fg-6">
+              <label for="receiverName">4. نام و نام خانوادگی گیرنده</label>
+              <input id="receiverName" name="receiverName" type="text" placeholder="مثال: مریم کاظمی" autocomplete="name">
+            </div>
+            <div class="fg fg-6">
+              <label for="receiverNID">5. کد ملی گیرنده</label>
+              <input id="receiverNID" name="receiverNID" type="text" inputmode="numeric" placeholder="10 رقم" pattern="[\d۰-۹]{10}" maxlength="10">
+            </div>
+            <div class="fg">
+              <label for="destPost">6. کد پستی محل تخلیه (مقصد)</label>
+              <input id="destPost" name="destPost" type="text" inputmode="numeric" placeholder="10 رقم" pattern="[\d۰-۹]{10}" maxlength="10">
+            </div>
+          </div>
+        </section>
+
+        <!-- آدرس‌ها + مسافت -->
+        <section class="card span-8">
+          <h3 class="section-title"><span class="dot"></span>آدرس بارگیری و تخلیه + محاسبه مسافت دقیق</h3>
+          <div class="form-grid">
+            <div class="fg relative">
+              <label class="req" for="originAddress">7. مبدأ (آدرس بارگیری)</label>
+              <input id="originAddress" name="originAddress" type="text" placeholder="استان، شهر، خیابان، پلاک..." required autocomplete="off">
+              <div id="suggOrigin" class="suggest" role="listbox" aria-label="پیشنهادات آدرس مبدأ"></div>
+            </div>
+            <div class="fg relative">
+              <label class="req" for="destAddress">8. مقصد (آدرس تخلیه)</label>
+              <input id="destAddress" name="destAddress" type="text" placeholder="استان، شهر، خیابان، پلاک..." required autocomplete="off">
+              <div id="suggDest" class="suggest" role="listbox" aria-label="پیشنهادات آدرس مقصد"></div>
+            </div>
+
+            <div class="fg fg-8">
+              <label for="distanceKm">ب- √ مسافت دقیق (کیلومتر)</label>
+              <input id="distanceKm" name="distanceKm" class="mono" type="number" step="0.1" placeholder="به‌صورت خودکار محاسبه می‌شود" readonly>
+            </div>
+            <div class="fg fg-4">
+              <label>&nbsp;</label>
+              <div class="row">
+                <button class="btn" type="button" id="btnDistance">محاسبه مسافت</button>
+                <button class="btn secondary" type="button" id="btnSwap">جابجایی مبدأ/مقصد</button>
+              </div>
+            </div>
+
+            <div class="fg">
+              <div id="map"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- محموله -->
+        <section class="card span-4">
+          <h3 class="section-title"><span class="dot"></span>اطلاعات محموله</h3>
+          <div class="form-grid">
+            <div class="fg">
+              <label for="cargoType">9. نوع محموله</label>
+              <input id="cargoType" name="cargoType" type="text" placeholder="مثال: قطعات صنعتی">
+            </div>
+            <div class="fg fg-6">
+              <label for="weightKg">10. وزن (کیلوگرم)</label>
+              <input id="weightKg" name="weightKg" type="number" step="0.01" min="0" placeholder="مثال: 1200">
+            </div>
+            <div class="fg">
+              <label for="packaging">11. نوع بسته‌بندی و تعداد بسته‌ها</label>
+              <input id="packaging" name="packaging" type="text" placeholder="مثال: پالت | 8 عدد">
+            </div>
+            <div class="fg fg-6">
+              <label for="insurance">12. مبلغ بیمه بار (تومان)</label>
+              <input id="insurance" name="insurance" type="number" step="1" min="0" placeholder="مثال: 50000000">
+            </div>
+          </div>
+        </section>
+
+        <!-- اطلاعات راننده و ناوگان -->
+        <section class="card span-6">
+          <h3 class="section-title"><span class="dot"></span>اطلاعات راننده و ناوگان</h3>
+          <div class="form-grid">
+            <div class="fg fg-6">
+              <label for="driverName">13. نام و نام خانوادگی راننده</label>
+              <input id="driverName" name="driverName" type="text" placeholder="اختیاری">
+            </div>
+            <div class="fg fg-6">
+              <label for="driverNID">14. کد ملی راننده</label>
+              <input id="driverNID" name="driverNID" type="text" inputmode="numeric" placeholder="10 رقم" pattern="[\d۰-۹]{10}" maxlength="10">
+            </div>
+            <div class="fg fg-6">
+              <label class="req" for="smartNo">15. شماره هوشمند (کارت ناوگان)</label>
+              <input id="smartNo" name="smartNo" type="text" required placeholder="مثال: 1234567890">
+            </div>
+            <div class="fg fg-6">
+              <label class="req" for="plate">16. شماره پلاک وسیله نقلیه</label>
+              <input id="plate" name="plate" type="text" required placeholder="مثال: 12 ب 345 ایران 67">
+              <div class="hint small">الگوهای متداول پذیرفته می‌شود؛ اعتبارسنجی نرم انجام می‌شود.</div>
+            </div>
+            <div class="fg">
+              <label class="req" for="fleetType">17. نوع ناوگان (نوع بارگیر وسیله نقلیه)</label>
+              <input id="fleetType" name="fleetType" type="text" required placeholder="مثال: تریلی کفی 13.60 | 10 چرخ | یخچالی ...">
+            </div>
+            <div class="fg fg-6">
+              <label for="baseFare">18. مبلغ کرایه پایه (تومان)</label>
+              <input id="baseFare" name="baseFare" type="number" step="1" min="0" placeholder="مثال: 750000000">
+            </div>
+          </div>
+        </section>
+
+        <!-- سفارش‌دهنده -->
+        <section class="card span-6">
+          <h3 class="section-title"><span class="dot"></span>19. مشخصات سفارش‌دهنده</h3>
+          <div class="form-grid">
+            <div class="fg">
+              <label class="req" for="ordererName">نام و نام خانوادگی</label>
+              <input id="ordererName" name="ordererName" type="text" required placeholder="مثال: شرکت راهبران حمل">
+            </div>
+            <div class="fg">
+              <label class="req" for="ordererPhone">شماره تماس</label>
+              <input id="ordererPhone" name="ordererPhone" type="text" required inputmode="tel" placeholder="مثال: 0912xxxxxxx یا 021xxxxxxx">
+            </div>
+          </div>
+        </section>
+
+        <!-- پیش‌نمایش و خروجی -->
+        <section class="card span-12">
+          <h3 class="section-title"><span class="dot"></span>پیش‌نمایش سفارش</h3>
+          <div class="row" style="margin-bottom:10px">
+            <button class="btn" type="submit">ثبت و نمایش جدول</button>
+            <button class="btn secondary" type="button" id="btnReset">پاک‌سازی فرم</button>
+            <button class="btn warn" type="button" id="btnDownload">دانلود JSON سفارش</button>
+          </div>
+          <div class="table-wrap">
+            <table id="previewTable" aria-live="polite">
+              <thead>
+                <tr><th>فیلد</th><th>مقدار</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+      </div>
+    </form>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // ===== تنظیمات =====
+    const NES_API_KEY = "web.7579193bb20f407782efe483207ecf51"; // کلید API نشان (عمومی تحت وب)
+    const REF_LAT = 32.4279, REF_LNG = 53.6880; // مرکز ایران برای جستجوهای بدون مرجع
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+    // ===== ابزار =====
+    const digitsFaToEn = s => (s||"").toString()
+      .replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))
+      .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+    const normalizeFa = s => (s||"").replace(/ك/g,"ک").replace(/ي/g,"ی").replace(/\s+/g,' ').trim();
+    const formatNumber = n => (n===null||n===undefined||isNaN(n)) ? "" : n.toLocaleString('fa-IR');
+    const showToast = (msg, kind="info")=>{
+      const el = $("#toast");
+      el.textContent = msg;
+      el.className = "toast show";
+      el.style.borderColor = kind==="error" ? "rgba(239,68,68,.6)" : kind==="ok" ? "rgba(16,185,129,.6)" : "rgba(148,163,184,.35)";
+      setTimeout(()=> el.classList.remove("show"), 3000);
+    };
+
+    // اعتبارسنجی‌ها
+    function isValidIranNationalId(input){
+      const code = digitsFaToEn(String(input||"")).padStart(10,'0');
+      if(!/^\\d{10}$/.test(code)) return false;
+      if(/^(.)\\1{9}$/.test(code)) return false;
+      const check = parseInt(code[9],10);
+      let sum = 0;
+      for(let i=0;i<9;i++){ sum += parseInt(code[i],10) * (10 - i); }
+      const r = sum % 11;
+      return (r < 2 && check === r) || (r >= 2 && check === (11 - r));
+    }
+    const isValidPostal10 = s => /^\\d{10}$/.test(digitsFaToEn(s||""));
+    const isValidPhoneIR = s => /^0\\d{9,10}$/.test(digitsFaToEn((s||"").replace(/[^\\d]/g,'')));
+    function isLikelyIranPlate(s){
+      if(!s) return false;
+      s = normalizeFa(s).replace(/\\s+/g,' ');
+      const faLetter = '[آابتثجچحخدذرزسشصضطظعغفقکگلمنوهیپژ]';
+      const p1 = new RegExp(`^\\d{2}\\s*${faLetter}\\s*\\d{3}\\s*ایران\\s*\\d{2}$`);
+      const p2 = /^\\d{2}[آ-ی]\\d{3}-\\d{2}$/;
+      const p3 = /^\\d{2}\\s*[A-Za-zآ-ی]\\s*\\d{3}\\s*\\d{2}$/;
+      return p1.test(s) || p2.test(s) || p3.test(s);
+    }
+
+    // ===== Leaflet نقشه =====
+    let map, originMarker, destMarker, routeLayer;
+    function initMap(){
+      map = L.map('map', { zoomControl:true }).setView([32.4, 53.7], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
+    }
+    function setMarker(type, lat, lng){
+      const icon = L.circleMarker([lat,lng], {
+        radius:7, color: type==="origin" ? "#22d3ee" : "#f59e0b",
+        fillColor: type==="origin" ? "#67e8f9" : "#fde68a", fillOpacity:.9, weight:2
+      });
+      if(type==="origin"){ if(originMarker) originMarker.remove(); originMarker = icon.addTo(map); }
+      else { if(destMarker) destMarker.remove(); destMarker = icon.addTo(map); }
+    }
+    function drawRouteCoords(coords){
+      if(routeLayer) routeLayer.remove();
+      routeLayer = L.polyline(coords, { weight:5, opacity:.9 }).addTo(map);
+      const group = L.featureGroup([originMarker, destMarker, routeLayer]);
+      map.fitBounds(group.getBounds().pad(0.2));
+    }
+
+    // ===== Decoder for Neshan overview_polyline (Google Encoded Polyline) =====
+    // Returns: Array of [lat, lng]
+    function decodePolyline(str){
+      let index=0, lat=0, lng=0, coords=[];
+      while(index < str.length){
+        let b, shift=0, result=0;
+        do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+        const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+        lat += dlat;
+        shift=0; result=0;
+        do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+        const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+        lng += dlng;
+        coords.push([lat * 1e-5, lng * 1e-5]);
+      }
+      return coords;
+    }
+
+    // ===== Neshan REST wrappers =====
+    async function nesSearch(term, lat=REF_LAT, lng=REF_LNG){
+      const url = `https://api.neshan.org/v1/search?term=${encodeURIComponent(term)}&lat=${lat}&lng=${lng}`; // citeturn2view0
+      const res = await fetch(url, { headers: { "Api-Key": NES_API_KEY }, mode:"cors" });
+      if(!res.ok) throw new Error("Search API error " + res.status);
+      return res.json();
+    }
+    async function nesGeocode(address){
+      const url = `https://api.neshan.org/v6/geocoding?address=${encodeURIComponent(address)}`; // citeturn7view0
+      const res = await fetch(url, { headers: { "Api-Key": NES_API_KEY }, mode:"cors" });
+      if(!res.ok) throw new Error("Geocoding API error " + res.status);
+      return res.json();
+    }
+    async function nesReverse(lat, lng){
+      const url = `https://api.neshan.org/v5/reverse?lat=${lat}&lng=${lng}`; // citeturn3view0
+      const res = await fetch(url, { headers: { "Api-Key": NES_API_KEY }, mode:"cors" });
+      if(!res.ok) throw new Error("Reverse API error " + res.status);
+      return res.json();
+    }
+    async function nesDirection(origin, dest, type="car", alt=false, avoidTraffic=false, avoidOddEven=false){
+      const url = `https://api.neshan.org/v4/direction?type=${type}&origin=${origin.lat},${origin.lng}&destination=${dest.lat},${dest.lng}&alternative=${alt}&avoidTrafficZone=${avoidTraffic}&avoidOddEvenZone=${avoidOddEven}`; // citeturn4view0
+      const res = await fetch(url, { headers: { "Api-Key": NES_API_KEY }, mode:"cors" });
+      if(!res.ok) throw new Error("Direction API error " + res.status);
+      return res.json();
+    }
+    async function nesDistanceMatrix(origins, destinations, type="car"){
+      const enc = arr => arr.map(c => `${c.lat},${c.lng}`).join("|");
+      const url = `https://api.neshan.org/v1/distance-matrix?type=${type}&origins=${encodeURIComponent(enc(origins))}&destinations=${encodeURIComponent(enc(destinations))}`; // citeturn6view0
+      const res = await fetch(url, { headers: { "Api-Key": NES_API_KEY }, mode:"cors" });
+      if(!res.ok) throw new Error("DistanceMatrix API error " + res.status);
+      return res.json();
+    }
+
+    // Fallbacks (OSRM + Haversine) در صورت عدم دسترسی به نشان
+    function haversineKm(lat1,lng1,lat2,lng2){
+      const R=6371.0088, toRad=d=>d*Math.PI/180;
+      const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);
+      const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+      return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+    async function osrmRouteKm(a,b){
+      const url=`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`;
+      const res=await fetch(url);
+      if(!res.ok) throw new Error("OSRM error");
+      const data=await res.json();
+      return { km: (data.routes?.[0]?.distance||0)/1000.0, geometry: data.routes?.[0]?.geometry };
+    }
+
+    // ===== وضعیت آدرس‌ها =====
+    let origin = { lat:null, lng:null, label:null };
+    let dest   = { lat:null, lng:null, label:null };
+
+    async function resolveAddressToCoord(side){
+      const inputEl = side==="origin" ? $("#originAddress") : $("#destAddress");
+      const text = normalizeFa(inputEl.value);
+      if(!text || text.length < 3) return null;
+
+      // 1) تلاش با Geocoding
+      try {
+        const g = await nesGeocode(text);
+        if(g?.status==="OK" && g.location){
+          const lat = g.location.y, lng = g.location.x;
+          // Reverse برای آدرس استاندارد
+          try {
+            const r = await nesReverse(lat, lng);
+            const pretty = r?.formatted_address || text;
+            inputEl.value = pretty;
+          } catch {}
+          return { lat, lng, label: text };
+        }
+      } catch {}
+
+      // 2) تلاش با Search (نزدیک مرکز ایران یا مرکز نقشه)
+      try {
+        const c = map?.getCenter?.();
+        const s = await nesSearch(text, c?.lat || REF_LAT, c?.lng || REF_LNG);
+        const item = s?.items?.[0];
+        if(item?.location){ return { lat: item.location.y, lng: item.location.x, label: item.title || text }; }
+      } catch {}
+
+      return null;
+    }
+
+    async function autofillFromPostal(side){
+      // تلاش با Geocoding با خود کدپستی
+      const code = digitsFaToEn(side==="origin" ? $("#originPost").value : $("#destPost").value);
+      if(!isValidPostal10(code)) return;
+      try{
+        const g = await nesGeocode(code);
+        if(g?.status==="OK" && g.location){
+          const lat=g.location.y, lng=g.location.x;
+          const r = await nesReverse(lat, lng);
+          const addr = r?.formatted_address || "";
+          if(side==="origin"){
+            origin = { lat, lng, label: addr || code };
+            $("#originAddress").value = addr || code;
+            setMarker("origin", lat, lng);
+          }else{
+            dest = { lat, lng, label: addr || code };
+            $("#destAddress").value = addr || code;
+            setMarker("dest", lat, lng);
+          }
+          showToast("آدرس از روی کدپستی تکمیل شد.", "ok");
+        }
+      }catch(e){
+        // تلاش با Search
+        try{
+          const s = await nesSearch(code, REF_LAT, REF_LNG);
+          const it = s?.items?.[0];
+          if(it?.location){
+            const lat = it.location.y, lng = it.location.x;
+            const r = await nesReverse(lat, lng).catch(()=>({}));
+            const addr = r?.formatted_address || it.address || it.title || code;
+            if(side==="origin"){
+              origin = { lat, lng, label: addr };
+              $("#originAddress").value = addr;
+              setMarker("origin", lat, lng);
+            }else{
+              dest = { lat, lng, label: addr };
+              $("#destAddress").value = addr;
+              setMarker("dest", lat, lng);
+            }
+            showToast("آدرس از روی کدپستی تکمیل شد.", "ok");
+          }
+        }catch{}
+      }
+    }
+
+    async function calcDistance(){
+      if(!origin.lat || !dest.lat){
+        showToast("ابتدا آدرس مبدأ و مقصد را تعیین کنید.", "error");
+        return;
+      }
+      // 1) تلاش با Direction API
+      try{
+        const d = await nesDirection(origin, dest, "car", false, false, false);
+        const route = d?.routes?.[0];
+        if(route){
+          const leg = route.legs?.[0];
+          const meters = leg?.distance?.value ?? null;
+          if(meters !== null){
+            $("#distanceKm").value = (Math.round((meters/1000)*10)/10).toString();
+          }
+          const points = route.overview_polyline?.points;
+          if(points){
+            const coords = decodePolyline(points).map(([la,ln])=>[la, ln]);
+            drawRouteCoords(coords);
+          }
+          showToast("مسافت دقیق بر اساس مسیر رانندگی.", "ok");
+          return;
+        }
+      }catch(e){}
+
+      // 2) تلاش با Distance Matrix (در صورت نیاز به ETA در آینده قابل استفاده است)
+      try{
+        const m = await nesDistanceMatrix([origin],[dest],"car");
+        const meters = m?.rows?.[0]?.elements?.[0]?.distance?.value ?? null;
+        if(meters !== null){
+          $("#distanceKm").value = (Math.round((meters/1000)*10)/10).toString();
+          showToast("مسافت با Distance Matrix.", "ok");
+          return;
+        }
+      }catch(e){}
+
+      // 3) Fallback
+      try{
+        const r = await osrmRouteKm(origin, dest);
+        if(r.km){
+          $("#distanceKm").value = (Math.round(r.km*10)/10).toString();
+          if(r.geometry){ drawRouteCoords(r.geometry.coordinates.map(c=>[c[1],c[0]])); }
+          showToast("مسافت تقریبی (Fallback).", "ok");
+          return;
+        }
+      }catch(e){}
+      // 4) نهایی
+      const approx = haversineKm(origin.lat,origin.lng,dest.lat,dest.lng);
+      $("#distanceKm").value = (Math.round(approx*10)/10).toString();
+      showToast("مسافت هوایی (Haversine).", "ok");
+    }
+
+    // ===== پیشنهادات جستجو (autocomplete) با Search API =====
+    function attachSuggest(inputEl, panelEl, side){
+      let timer = null;
+      inputEl.addEventListener("input", ()=>{
+        const q = normalizeFa(inputEl.value);
+        if(timer) clearTimeout(timer);
+        if(q.length < 3){ panelEl.classList.remove("show"); panelEl.innerHTML=""; return; }
+        timer = setTimeout(async ()=>{
+          try{
+            const c = map?.getCenter?.();
+            const resp = await nesSearch(q, c?.lat || REF_LAT, c?.lng || REF_LNG);
+            const items = resp?.items || [];
+            if(items.length === 0){ panelEl.classList.remove("show"); panelEl.innerHTML=""; return; }
+            panelEl.innerHTML = items.slice(0,10).map(it=>`<div class="item" data-lat="${it.location?.y}" data-lng="${it.location?.x}" data-title="${it.title||''}" data-address="${it.address||''}"><div class="small">${it.title||''}</div><div class="small" style="color:#94a3b8">${it.address||it.region||''}</div></div>`).join("");
+            panelEl.classList.add("show");
+          }catch{
+            panelEl.classList.remove("show"); panelEl.innerHTML="";
+          }
+        }, 220);
+      });
+      panelEl.addEventListener("click", (e)=>{
+        const el = e.target.closest(".item"); if(!el) return;
+        const lat = parseFloat(el.getAttribute("data-lat"));
+        const lng = parseFloat(el.getAttribute("data-lng"));
+        const label = el.getAttribute("data-address") || el.getAttribute("data-title");
+        inputEl.value = label || inputEl.value;
+        panelEl.classList.remove("show");
+        if(side==="origin"){
+          origin = { lat, lng, label };
+          setMarker("origin", lat, lng);
+        }else{
+          dest = { lat, lng, label };
+          setMarker("dest", lat, lng);
+        }
+        map.setView([lat,lng], 13);
+      });
+      document.addEventListener("click", (e)=>{
+        if(!panelEl.contains(e.target) && e.target !== inputEl){
+          panelEl.classList.remove("show");
+        }
+      });
+      inputEl.addEventListener("blur", ()=> setTimeout(()=>panelEl.classList.remove("show"), 150));
+    }
+
+    // ===== جمع‌آوری و نمایش =====
+    function collectFormData(){
+      return {
+        senderName: $("#senderName").value,
+        senderNID: digitsFaToEn($("#senderNID").value),
+        originPost: digitsFaToEn($("#originPost").value),
+        receiverName: $("#receiverName").value,
+        receiverNID: digitsFaToEn($("#receiverNID").value),
+        destPost: digitsFaToEn($("#destPost").value),
+        originAddress: $("#originAddress").value,
+        destAddress: $("#destAddress").value,
+        cargoType: $("#cargoType").value,
+        weightKg: $("#weightKg").value ? Number($("#weightKg").value) : null,
+        packaging: $("#packaging").value,
+        insurance: $("#insurance").value ? Number($("#insurance").value) : null,
+        driverName: $("#driverName").value,
+        driverNID: digitsFaToEn($("#driverNID").value),
+        smartNo: $("#smartNo").value,
+        plate: $("#plate").value,
+        fleetType: $("#fleetType").value,
+        baseFare: $("#baseFare").value ? Number($("#baseFare").value) : null,
+        ordererName: $("#ordererName").value,
+        ordererPhone: $("#ordererPhone").value,
+        distanceKm: $("#distanceKm").value ? Number($("#distanceKm").value) : null,
+        geo: {
+          origin, dest
+        },
+        meta: {
+          createdAt: new Date().toISOString(),
+          providers: { distance: "Neshan Direction/DistanceMatrix", geocode: "Neshan Geocoding", reverse: "Neshan Reverse" }
+        }
+      };
+    }
+    function renderPreviewTable(data){
+      const rows = [
+        ["نام و نام خانوادگی فرستنده", data.senderName],
+        ["کد ملی فرستنده", data.senderNID],
+        ["کد پستی مبدأ", data.originPost],
+        ["نام و نام خانوادگی گیرنده", data.receiverName],
+        ["کد ملی گیرنده", data.receiverNID],
+        ["کد پستی مقصد", data.destPost],
+        ["مبدأ (آدرس بارگیری)", data.originAddress],
+        ["مقصد (آدرس تخلیه)", data.destAddress],
+        ["نوع محموله", data.cargoType],
+        ["وزن (کیلوگرم)", data.weightKg!==null ? formatNumber(data.weightKg) : ""],
+        ["نوع بسته‌بندی و تعداد", data.packaging],
+        ["مبلغ بیمه (تومان)", data.insurance!==null ? formatNumber(data.insurance) : ""],
+        ["نام و نام خانوادگی راننده", data.driverName],
+        ["کد ملی راننده", data.driverNID],
+        ["شماره هوشمند (کارت ناوگان)", data.smartNo],
+        ["شماره پلاک وسیله نقلیه", data.plate],
+        ["نوع ناوگان", data.fleetType],
+        ["مبلغ کرایه پایه (تومان)", data.baseFare!==null ? formatNumber(data.baseFare) : ""],
+        ["نام سفارش‌دهنده", data.ordererName],
+        ["شماره تماس سفارش‌دهنده", data.ordererPhone],
+        ["مسافت دقیق (کیلومتر)", data.distanceKm!==null ? formatNumber(data.distanceKm) : ""],
+        ["زمان ثبت", new Date(data.meta.createdAt).toLocaleString('fa-IR')],
+      ];
+      const tbody = $("#previewTable tbody");
+      tbody.innerHTML = rows.map(([k,v])=>`<tr><td>${k}</td><td class="mono">${v ?? ""}</td></tr>`).join("");
+    }
+
+    // ===== اعتبارسنجی فرم =====
+    function validateFormOrWarn(){
+      const requiredIds = ["senderName","originAddress","destAddress","smartNo","plate","fleetType","ordererName","ordererPhone"];
+      for(const id of requiredIds){
+        const el = $("#"+id);
+        if(!el.value || !el.value.trim()){
+          el.focus();
+          showToast(`فیلد اجباری: ${$("label[for='"+id+"']").textContent}`, "error");
+          return false;
+        }
+      }
+      for(const id of ["senderNID","receiverNID","driverNID"]){
+        const val = $("#"+id).value.trim();
+        if(val && !isValidIranNationalId(val)){
+          $("#"+id).focus(); showToast(`کد ملی نامعتبر در فیلد: ${$("label[for='"+id+"']").textContent}`, "error"); return false;
+        }
+      }
+      for(const id of ["originPost","destPost"]){
+        const val = $("#"+id).value.trim();
+        if(val && !isValidPostal10(val)){
+          $("#"+id).focus(); showToast(`کد پستی نامعتبر در فیلد: ${$("label[for='"+id+"']").textContent}`, "error"); return false;
+        }
+      }
+      if(!isValidPhoneIR($("#ordererPhone").value)){
+        $("#ordererPhone").focus(); showToast("شماره تماس سفارش‌دهنده نامعتبر است.", "error"); return false;
+      }
+      if(!isLikelyIranPlate($("#plate").value)){
+        $("#plate").focus(); showToast("الگوی پلاک وسیله نقلیه معتبر نیست.", "error"); return false;
+      }
+      return true;
+    }
+
+    // ===== رویدادها =====
+    document.addEventListener("DOMContentLoaded", async ()=>{
+      initMap();
+
+      // پیشنهادات تایپی (Autocomplete)
+      attachSuggest($("#originAddress"), $("#suggOrigin"), "origin");
+      attachSuggest($("#destAddress"), $("#suggDest"), "dest");
+
+      $("#btnDistance").addEventListener("click", calcDistance);
+      $("#btnSwap").addEventListener("click", ()=>{
+        const oa = $("#originAddress"), da = $("#destAddress");
+        const tmp = oa.value; oa.value = da.value; da.value = tmp;
+        const o2 = {...origin}; origin = {...dest}; dest = {...o2};
+        if(origin.lat){ setMarker("origin", origin.lat, origin.lng); }
+        if(dest.lat){ setMarker("dest", dest.lat, dest.lng); }
+        if(origin.lat && dest.lat) calcDistance();
+      });
+      $("#btnReset").addEventListener("click", ()=>{
+        $("#orderForm").reset(); $("#distanceKm").value = "";
+        [routeLayer,originMarker,destMarker].forEach(l=> l && l.remove());
+        routeLayer=originMarker=destMarker=null; map.setView([32.4, 53.7], 5);
+        origin={lat:null,lng:null,label:null}; dest={lat:null,lng:null,label:null};
+      });
+      $("#btnDownload").addEventListener("click", ()=>{
+        const data = collectFormData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json;charset=utf-8"});
+        const url = URL.createObjectURL(blob); const a = document.createElement("a");
+        a.href = url; a.download = `order_${Date.now()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      });
+
+      // اتو-کامپلیت از روی متن آدرس (پس از ترک فیلد)
+      $("#originAddress").addEventListener("blur", async ()=>{
+        const r = await resolveAddressToCoord("origin");
+        if(r){ origin = r; setMarker("origin", r.lat, r.lng); }
+      });
+      $("#destAddress").addEventListener("blur", async ()=>{
+        const r = await resolveAddressToCoord("dest");
+        if(r){ dest = r; setMarker("dest", r.lat, r.lng); }
+      });
+
+      // اتوفیل بر اساس کدپستی
+      $("#originPost").addEventListener("input", ()=> isValidPostal10($("#originPost").value) && autofillFromPostal("origin"));
+      $("#destPost").addEventListener("input", ()=> isValidPostal10($("#destPost").value) && autofillFromPostal("dest"));
+
+      // همسان‌سازی ارقام
+      ["senderNID","receiverNID","driverNID","originPost","destPost","ordererPhone","weightKg","insurance","baseFare","distanceKm"].forEach(id=>{
+        const el = $("#"+id); if(!el) return; el.addEventListener("input", ()=>{ el.value = digitsFaToEn(el.value); });
+      });
+
+      // ثبت فرم
+      $("#orderForm").addEventListener("submit", async (e)=>{
+        e.preventDefault();
+        if(!validateFormOrWarn()) return;
+
+        // اگر مختصات آماده نیست از آدرس‌ها resolving انجام شود
+        if(!origin.lat){ const r = await resolveAddressToCoord("origin"); if(r){ origin=r; setMarker("origin", r.lat, r.lng); } }
+        if(!dest.lat){ const r = await resolveAddressToCoord("dest"); if(r){ dest=r; setMarker("dest", r.lat, r.lng); } }
+
+        if(origin.lat && dest.lat && !$("#distanceKm").value){ await calcDistance(); }
+
+        renderPreviewTable(collectFormData());
+        showToast("پیش‌نمایش سفارش آماده شد.", "ok");
+      });
+    });
+
+  </script>
+</body>
+</html>
